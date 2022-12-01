@@ -201,9 +201,8 @@ async def tiny_url_main(url):
 
 # todo -> bypass long droplink url
 async def droplink_bypass_handler(text):
-
     if LINK_BYPASS:
-        links = re.findall(r'https?://droplink.co[^\s"*<>`()]+', text)
+        links = await extract_link(text)
         for link in links:
             if "https://droplink.co/st?api=" in link:
                 bypassed_link = link.split("url=")[-1]
