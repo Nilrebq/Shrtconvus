@@ -22,6 +22,8 @@ from pyrogram.types import InputMediaPhoto
 import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
+import PyBypass as bypasser
+
 
 mdisk = Mdisk(MDISK_API)
 shortzy = Shortzy(DROPLINK_API, BASE_SITE)
@@ -79,22 +81,17 @@ async def main_convertor_handler(message:Message, type:str, edit_caption:bool=Fa
             fileid = BANNER_IMAGE
             if edit_caption:
                 fileid = InputMediaPhoto(BANNER_IMAGE, caption=shortenedText)
-        
+
 
     if message.text:
-        if user_method in ["droplink", "mdlink"] :
-            if '|' not in caption:
-                pass
-            else:
-                regex = r"(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’]))\s\|\s([a-zA-Z0-9_]){,30}"
-                custom_alias = re.match(regex, caption)
+        if user_method in {"droplink", "mdlink"} and '|' in caption:
+            regex = r"(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’]))\s\|\s([a-zA-Z0-9_]){,30}"
+            if custom_alias := re.match(regex, caption):
+                custom_alias = custom_alias[0].split('|')
+                alias = custom_alias[1].strip()
+                url = custom_alias[0].strip()
+                shortenedText = await method_func(url, alias)
 
-                if custom_alias:
-                    custom_alias = custom_alias.group(0).split('|')
-                    alias = custom_alias[1].strip()
-                    url = custom_alias[0].strip()
-                    shortenedText = await method_func(url, alias)
-        
         if edit_caption:
             return await message.edit(shortenedText, disable_web_page_preview=True, reply_markup=reply_markup)
 
@@ -111,7 +108,7 @@ async def main_convertor_handler(message:Message, type:str, edit_caption:bool=Fa
         if message.document:
             return await message.reply_document(fileid, caption=shortenedText, reply_markup=reply_markup, quote=True)
 
-        
+
         elif message.photo:
             return await message.reply_photo(fileid, caption=shortenedText, reply_markup=reply_markup, quote=True)
 
@@ -144,7 +141,7 @@ async def replace_link(text, x=""):
 
         long_url = link
 
-        # Include domain validation 
+        # Include domain validation
         if INCLUDE_DOMAIN:
             include = INCLUDE_DOMAIN
             domain = [domain.strip() for domain in include]
@@ -155,24 +152,20 @@ async def replace_link(text, x=""):
                     short_link = await tiny_url_main(await shortzy.get_quick_link(link))
                 text = text.replace(long_url, short_link)
 
-        # Exclude domain validation 
         elif EXCLUDE_DOMAIN:
             exclude = EXCLUDE_DOMAIN
             domain = [domain.strip() for domain in exclude]
-            if any(i in link for i in domain):
-                pass
-            else:
+            if all(i not in link for i in domain):
                 try:
                     short_link = await shortzy.convert(link, x)
-                except:
+                except Exception:
                     short_link = await tiny_url_main(await shortzy.get_quick_link(link))
                 text = text.replace(long_url, short_link)
 
-        # if not include domain and exlude domain
         else:
             try:
                 short_link = await shortzy.convert(link, x)
-            except:
+            except Exception:
                 short_link = await tiny_url_main(await shortzy.get_quick_link(link))
             text = text.replace(long_url, short_link)
 
@@ -208,29 +201,45 @@ async def tiny_url_main(url):
 
 # todo -> bypass long droplink url
 async def droplink_bypass_handler(text):
-      
+
     if LINK_BYPASS:
-        links = re.findall(r'https?://droplink.co[^\s"*<>`()]+', text)	
+        links = re.findall(r'https?://droplink.co[^\s"*<>`()]+', text)
         for link in links:
-            if "https://droplink.co/st?api=" in text:
+            if "https://droplink.co/st?api=" in link:
                 bypassed_link = link.split("url=")[-1]
-                bypassed_link = bypassed_link.replace("filestorebottttttbot", "FILESTOREFORSRILINKS4KBOT").replace("FileShareBot_bot", "FILESTOREFORSRILINKS4KBOT")        
-                print(bypassed_link)
-            else:
-                bypassed_link = await droplink_bypass(link)
-                print(bypassed_link)
+                bypassed_link = bypassed_link.replace("filestorebottttttbot", "FILESTOREFORSRILINKS4KBOT").replace("FileShareBot_bot", "FILESTOREFORSRILINKS4KBOT")
+            elif check_link(link):
+                bypassed_link = bypasser.bypass(link)
+
             text = text.replace(link, bypassed_link)
     return text
 
+def check_link(link):
+    # Split the link into its parts
+    parts = link.split("/")
+
+    # Check if the link has a domain part
+    if len(parts) >= 3:
+        # Get the domain part of the link
+        domain = parts[2]
+
+        domains = ["tnlink.in", "dulink.in", "shareus.in", "droplink.co"]
+        # Check if the domain is in the list of domains
+        if domain in domains:
+            # Return True if the domain is in the list
+            return True
+
+    # Return False if the domain is not in the list
+    return False
 
 # credits -> https://github.com/TheCaduceus/Link-Bypasser
-async def droplink_bypass(url):
+async def droplink_bypass(url):  # sourcery skip: raise-specific-error
     
     try:
         # client = aiohttp.ClientSession()
         async with aiohttp.ClientSession() as client:
             async with client.get(url) as res:
-                
+
                 ref = re.findall("action[ ]{0,}=[ ]{0,}['|\"](.*?)['|\"]", await res.text())[0]
 
                 h = {'referer': ref}
@@ -242,7 +251,7 @@ async def droplink_bypass(url):
                     bs4 = BeautifulSoup(await res.content.read(), 'html.parser')
 
                     inputs = bs4.find_all('input')
-                    
+
                     data = { input.get('name'): input.get('value') for input in inputs }
 
                     h = {
@@ -259,15 +268,15 @@ async def droplink_bypass(url):
 
                         res = await res.json()
                         if res['status'] == 'success':
-                            
+
                             return res['url'].replace("filestorebottttttbot", "FILESTOREFORSRILINKS4KBOT").replace("FileShareBot_bot", "FILESTOREFORSRILINKS4KBOT")
-                            
+
                         else:
                             raise Exception("Error while bypassing droplink {0}: {1}".format(url, res['message']))
 
 
     except Exception as e:
-        raise Exception("Error while bypassing droplink {0}: {1}".format(url, e))
+        raise Exception("Error while bypassing droplink {0}: {1}".format(url, e)) from e
 
 
 async def is_droplink_url(url):
@@ -354,11 +363,8 @@ async def TimeFormatter(milliseconds) -> str:
     minutes, seconds = divmod(seconds, 60)
     hours, minutes = divmod(minutes, 60)
     days, hours = divmod(hours, 24)
-    tmp = ((str(days) + "d, ") if days else "") + \
-        ((str(hours) + "h, ") if hours else "") + \
-        ((str(minutes) + "m, ") if minutes else "") + \
-        ((str(seconds) + "s, ") if seconds else "") + \
-        ((str(milliseconds) + "ms, ") if milliseconds else "")
+    tmp = (f"{str(days)}d, " if days else "") + (f"{str(hours)}h, " if hours else "") + (f"{str(minutes)}m, " if minutes else "") + (f"{str(seconds)}s, " if seconds else "") + (f"{str(milliseconds)}ms, " if milliseconds else "")
+
     return tmp[:-2]
 
 
@@ -377,7 +383,7 @@ async def getHerokuDetails(h_api_key, h_app_name):
             "Authorization": f"Bearer {h_api_key}",
             "Accept": "application/vnd.heroku+json; version=3.account-quotas",
         }
-        path = "/accounts/" + user_id + "/actions/get-quota"
+        path = f"/accounts/{user_id}/actions/get-quota"
 
         async with aiohttp.ClientSession() as session:
             result = (await session.get(heroku_api + path, headers=headers))
@@ -401,14 +407,12 @@ async def getHerokuDetails(h_api_key, h_app_name):
                 except Exception as t:
                     logger.error("error when adding main dyno")
                     logger.error(t)
-                    pass
             else:
                 try:
                     OtherAppsUsage += int(apps.get("quota_used"))
                 except Exception as t:
                     logger.error("error when adding other dyno")
                     logger.error(t)
-                    pass
         logger.info(f"This App: {str(app.name)}")
         abc += f"<b>- This App:</b> `{await TimeFormatter(AppQuotaUsed)}`\n"
         abc += f"<b>- Other:</b> `{await TimeFormatter(OtherAppsUsage)}`"
