@@ -9,3 +9,4 @@ mdisky
 heroku3
 shortzy
 PyBypass
+cloudscraper

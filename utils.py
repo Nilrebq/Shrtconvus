@@ -2,6 +2,7 @@ import asyncio
 import random
 import re
 import json
+import time
 import aiohttp
 import heroku3
 from pyrogram import Client
@@ -23,7 +24,9 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
 import PyBypass as bypasser
+import cloudscraper
 
+scraper = cloudscraper.create_scraper() 
 
 mdisk = Mdisk(MDISK_API)
 shortzy = Shortzy(DROPLINK_API, BASE_SITE)
@@ -148,7 +151,7 @@ async def replace_link(text, x=""):
             if any(i in link for i in domain):
                 try:
                     short_link = await shortzy.convert(link, x)
-                except:
+                except Exception:
                     short_link = await tiny_url_main(await shortzy.get_quick_link(link))
                 text = text.replace(long_url, short_link)
 
@@ -204,13 +207,15 @@ async def droplink_bypass_handler(text):
     if LINK_BYPASS:
         links = await extract_link(text)
         for link in links:
+            bypassed_link = None
             if "https://droplink.co/st?api=" in link:
                 bypassed_link = link.split("url=")[-1]
                 bypassed_link = bypassed_link.replace("filestorebottttttbot", "FILESTOREFORSRILINKS4KBOT").replace("FileShareBot_bot", "FILESTOREFORSRILINKS4KBOT")
             elif check_link(link):
                 bypassed_link = bypasser.bypass(link)
 
-            text = text.replace(link, bypassed_link)
+            if bypassed_link:
+                text = text.replace(link, bypassed_link)
     return text
 
 def check_link(link):
@@ -222,7 +227,7 @@ def check_link(link):
         # Get the domain part of the link
         domain = parts[2]
 
-        domains = ["tnlink.in", "dulink.in", "shareus.in", "droplink.co"]
+        domains = ["tnlink.in", "shareus.in", "droplink.co"]
         # Check if the domain is in the list of domains
         if domain in domains:
             # Return True if the domain is in the list
@@ -276,6 +281,8 @@ async def droplink_bypass(url):  # sourcery skip: raise-specific-error
 
     except Exception as e:
         raise Exception("Error while bypassing droplink {0}: {1}".format(url, e)) from e
+
+
 
 
 async def is_droplink_url(url):
